@@ -1,0 +1,129 @@
+// ===== Purchase & Warranty Tracker — Google Apps Script backend =====
+// 1) Change the two constants below, 2) run setup() once, 3) Deploy > Web app.
+const SUPER_ADMIN_USER = 'admin';
+const SUPER_ADMIN_PASS = 'ChangeMe@123';   // change BEFORE running setup()
+const TZ = 'Asia/Kolkata';
+const FOLDER_NAME = 'Warranties Data';     // Drive folder where invoice images are stored
+
+const SHEET_ID = '1kAN-JYk8NtycXt3p97x_JpOB_d4v0_Idc2KQaVXjemY';   // only needed if the script is NOT created via Extensions > Apps Script inside the Sheet
+const props = () => PropertiesService.getScriptProperties();
+const ss = () => SpreadsheetApp.openById(SHEET_ID || props().getProperty('SSID'));
+
+function setup() {
+  const bound = SpreadsheetApp.getActive();
+  const sid = SHEET_ID || (bound && bound.getId());
+  if (!sid) throw new Error('Paste your Google Sheet ID into SHEET_ID at the top, then run setup() again.');
+  props().setProperty('SSID', sid);
+  const u = ss().getSheetByName('Users') || ss().insertSheet('Users');
+  if (!u.getLastRow()) u.appendRow(['username', 'hash', 'salt', 'role', 'active', 'created']);
+  const p = ss().getSheetByName('Purchases') || ss().insertSheet('Purchases');
+  if (!p.getLastRow()) p.appendRow(['id', 'username', 'product', 'qty', 'purchaseDate', 'warrantyMonths', 'expiryDate', 'payment', 'fileId', 'mime', 'created']);
+  p.getRange('E:G').setNumberFormat('@');
+  if (!find('Users', 'username', SUPER_ADMIN_USER)) mkUser(SUPER_ADMIN_USER, SUPER_ADMIN_PASS, 'superadmin');
+  if (!props().getProperty('FOLDER')) {
+    const f = DriveApp.getFoldersByName(FOLDER_NAME);
+    props().setProperty('FOLDER', (f.hasNext() ? f.next() : DriveApp.createFolder(FOLDER_NAME)).getId());
+  }
+}
+
+const hash = (pw, salt) => Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, salt + pw));
+function table(n) {
+  const s = ss().getSheetByName(n), v = s.getDataRange().getValues(), h = v.shift();
+  return { s, rows: v.map((r, i) => { const o = { _r: i + 2 }; h.forEach((k, j) => o[k] = r[j]); return o; }) };
+}
+const find = (n, k, val) => table(n).rows.find(r => String(r[k]).toLowerCase() === String(val).toLowerCase());
+function mkUser(name, pw, role) {
+  const salt = Utilities.getUuid();
+  ss().getSheetByName('Users').appendRow([name, hash(pw, salt), salt, role, true, new Date()]);
+}
+const out = o => ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+const addMonths = (d, m) => { const x = new Date(d + 'T00:00:00'); x.setMonth(x.getMonth() + m); return Utilities.formatDate(x, TZ, 'yyyy-MM-dd'); };
+
+function doGet() { return out({ ok: true, msg: 'Warranty API running' }); }
+
+function doPost(e) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try { return out(route(JSON.parse(e.postData.contents))); }
+  catch (x) { return out({ err: String(x.message || x) }); }
+  finally { lock.releaseLock(); }
+}
+
+function route(q) {
+  const cache = CacheService.getScriptCache();
+  if (q.action === 'login') {
+    const name = String(q.u || '').trim(), fk = 'f_' + name.toLowerCase();
+    if (+cache.get(fk) >= 5) throw 'Too many attempts. Try again in 10 minutes.';
+    const u = find('Users', 'username', name);
+    if (!u || hash(q.p || '', u.salt) !== u.hash) { cache.put(fk, (+cache.get(fk) || 0) + 1, 600); throw 'Invalid username or password'; }
+    if (u.active !== true) throw 'Account is deactivated. Contact admin.';
+    const isAdm = u.role === 'superadmin';
+    if (isAdm && !q.admin) throw 'Super admin must sign in from the admin page';
+    if (!isAdm && q.admin) throw 'This page is for the super admin only';
+    cache.remove(fk);
+    const token = Utilities.getUuid() + Utilities.getUuid();
+    cache.put('s_' + token, u.username, 21600);
+    return { token, user: u.username, role: u.role };
+  }
+  const un = cache.get('s_' + q.token), me = un && find('Users', 'username', un);
+  if (!me || me.active !== true) return { err: 'auth' };
+  const admin = me.role === 'superadmin';
+  const needAdmin = () => { if (!admin) throw 'Not allowed'; };
+  const target = () => { const t = find('Users', 'username', q.name); if (!t) throw 'User not found'; if (t.role === 'superadmin') throw 'Cannot modify super admin'; return t; };
+  const U = table('Users').s;
+
+  switch (q.action) {
+    case 'logout': cache.remove('s_' + q.token); return { ok: 1 };
+    case 'changePw': {
+      if (hash(q.old || '', me.salt) !== me.hash) throw 'Current password is wrong';
+      if (String(q.pw || '').length < 6) throw 'New password must be at least 6 characters';
+      const salt = Utilities.getUuid();
+      U.getRange(me._r, 2, 1, 2).setValues([[hash(q.pw, salt), salt]]);
+      return { ok: 1 };
+    }
+    case 'users': needAdmin(); return { users: table('Users').rows.map(r => ({ name: r.username, role: r.role, active: r.active === true })) };
+    case 'addUser': {
+      needAdmin();
+      const n = String(q.name || '').trim();
+      if (!/^[A-Za-z0-9_.-]{3,30}$/.test(n)) throw 'Username: 3-30 letters/numbers/._-';
+      if (String(q.pw || '').length < 6) throw 'Password must be at least 6 characters';
+      if (find('Users', 'username', n)) throw 'Username already exists';
+      mkUser(n, q.pw, 'user'); return { ok: 1 };
+    }
+    case 'toggleUser': { needAdmin(); const t = target(); U.getRange(t._r, 5).setValue(t.active !== true); return { ok: 1 }; }
+    case 'resetPw': {
+      needAdmin(); const t = target();
+      if (String(q.pw || '').length < 6) throw 'Password must be at least 6 characters';
+      const salt = Utilities.getUuid(); U.getRange(t._r, 2, 1, 2).setValues([[hash(q.pw, salt), salt]]); return { ok: 1 };
+    }
+    case 'delUser': { needAdmin(); U.deleteRow(target()._r); return { ok: 1 }; }
+
+    case 'list':
+      return { items: table('Purchases').rows.filter(r => r.username === me.username).map(r => ({ id: r.id, product: r.product, qty: r.qty, date: r.purchaseDate, months: r.warrantyMonths, expiry: r.expiryDate, payment: r.payment, hasFile: !!r.fileId })) };
+    case 'add': {
+      const months = Math.round(+q.months);
+      if (!q.product || !(+q.qty > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(q.date) || !(months >= 0)) throw 'Please fill all fields correctly';
+      if (['Cash', 'UPI', 'Net Banking'].indexOf(q.payment) < 0) throw 'Invalid payment mode';
+      let fileId = '', mime = '';
+      const id = Utilities.getUuid();
+      if (q.file) {
+        mime = q.mime === 'image/png' ? 'image/png' : 'image/jpeg';
+        fileId = DriveApp.getFolderById(props().getProperty('FOLDER')).createFile(Utilities.newBlob(Utilities.base64Decode(q.file), mime, me.username + '_' + q.date + '_' + id.slice(0, 6))).getId();
+      }
+      table('Purchases').s.appendRow([id, me.username, String(q.product).trim(), +q.qty, q.date, months, addMonths(q.date, months), q.payment, fileId, mime, new Date()]);
+      return { ok: 1 };
+    }
+    case 'del': {
+      const r = table('Purchases').rows.find(x => x.id === q.id && x.username === me.username);
+      if (!r) throw 'Not found';
+      if (r.fileId) try { DriveApp.getFileById(r.fileId).setTrashed(true); } catch (e) {}
+      table('Purchases').s.deleteRow(r._r); return { ok: 1 };
+    }
+    case 'invoice': {
+      const r = table('Purchases').rows.find(x => x.id === q.id && x.username === me.username);
+      if (!r || !r.fileId) throw 'No invoice attached';
+      return { mime: r.mime, data: Utilities.base64Encode(DriveApp.getFileById(r.fileId).getBlob().getBytes()) };
+    }
+  }
+  throw 'Unknown action';
+}

@@ -1,19 +1,17 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Billbook — Purchases & Warranties</title>
+<title>Itransform Technology — Purchases & Warranties</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0e1b18;--ink:#f3efe6;--mute:#a9b8b2;--amber:#e9a23b;--teal:#3aa596;--rust:#d2603a;--glass:rgba(255,255,255,.07);--line:rgba(255,255,255,.16)}
+:root{--bg:#0d1417;--ink:#f3efe6;--mute:#a9b8b2;--amber:#e9a23b;--teal:#3aa596;--rust:#d2603a;--glass:rgba(255,255,255,.07);--line:rgba(255,255,255,.16)}
 *{box-sizing:border-box;margin:0}
 body{font:15px/1.5 Figtree,system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden}
 .bg{position:fixed;inset:0;z-index:-1;overflow:hidden}
-.bg i{position:absolute;border-radius:50%;filter:blur(70px);opacity:.55;animation:drift 22s ease-in-out infinite alternate}
-.bg i:nth-child(1){width:46vmax;height:46vmax;background:var(--amber);top:-14vmax;left:-10vmax;opacity:.4}
-.bg i:nth-child(2){width:40vmax;height:40vmax;background:var(--teal);bottom:-16vmax;right:-8vmax;animation-duration:28s}
-.bg i:nth-child(3){width:24vmax;height:24vmax;background:var(--rust);top:45%;left:48%;animation-duration:18s;opacity:.35}
-@keyframes drift{to{transform:translate(8vmax,-6vmax) scale(1.18) rotate(20deg)}}
-.bg:after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.015) 0 1px,transparent 1px 3px)}
+.bg i{position:absolute;border-radius:50%;filter:blur(80px);opacity:.45;animation:drift 24s ease-in-out infinite alternate}
+.bg i:nth-child(1){width:44vmax;height:44vmax;background:var(--teal);top:-14vmax;right:-10vmax}
+.bg i:nth-child(2){width:34vmax;height:34vmax;background:#2a5b8a;bottom:-14vmax;left:-8vmax;animation-duration:30s}
+@keyframes drift{to{transform:translate(-7vmax,6vmax) scale(1.15)}}
 h1,h2,h3,.brand{font-family:Fraunces,Georgia,serif;font-weight:700}
 .glass{background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);border-radius:18px;box-shadow:0 20px 50px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.12)}
 .hide{display:none!important}
@@ -60,7 +58,7 @@ dialog img{max-width:88vw;max-height:80vh;border-radius:14px;display:block}
 .empty{padding:30px;text-align:center;color:var(--mute)}
 @media(max-width:760px){#login{grid-template-columns:1fr;padding:30px 18px}#login form{transform:none}.stats{grid-template-columns:1fr 1fr 1fr;gap:8px}.stat{padding:12px}.stat b{font-size:24px}}
 </style></head><body>
-<div class="bg"><i></i><i></i><i></i></div>
+<div class="bg"><i></i><i></i></div>
 
 <div id="login" class="hide">
   <div class="hero"><h1>Every bill.<br>Every warranty.<br><em>Kept safe.</em></h1><p>Know what you bought, what you paid, and exactly when the cover runs out — before the shop says "sorry, expired".</p></div>
@@ -74,7 +72,7 @@ dialog img{max-width:88vw;max-height:80vh;border-radius:14px;display:block}
 </div>
 
 <div id="app" class="hide">
-  <header class="glass"><div class="brand">Bill<b>book</b></div>
+  <header class="glass"><div class="brand">Itransform <b>Technology</b></div>
     <nav><button data-t="p" class="on">Purchases</button><button data-t="a">Account</button></nav>
     <span style="color:var(--mute)" id="who"></span><button class="ghost sm" id="lo">Log out</button></header>
   <main>
