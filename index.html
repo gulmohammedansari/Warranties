@@ -75,7 +75,7 @@ dialog img{max-width:88vw;max-height:80vh;border-radius:14px;display:block}
 
 <div id="app" class="hide">
   <header class="glass"><div class="brand">Bill<b>book</b></div>
-    <nav><button data-t="p" class="on">Purchases</button><button data-t="u" id="tu" class="hide">Users</button><button data-t="a">Account</button></nav>
+    <nav><button data-t="p" class="on">Purchases</button><button data-t="a">Account</button></nav>
     <span style="color:var(--mute)" id="who"></span><button class="ghost sm" id="lo">Log out</button></header>
   <main>
     <section id="s-p">
@@ -90,10 +90,6 @@ dialog img{max-width:88vw;max-height:80vh;border-radius:14px;display:block}
           <div><label>Invoice image</label><input id="pi" type="file" accept="image/*"></div>
         </div><div class="err" id="pe"></div><button id="pb" style="margin-top:6px">Save purchase</button></form>
       <div class="glass panel wrap"><input id="q" placeholder="Search products…" style="max-width:260px;margin-bottom:10px"><div id="tb"></div></div>
-    </section>
-    <section id="s-u" class="hide">
-      <form class="glass panel" id="uf"><h3>Add user</h3><div class="grid"><div><label>Username</label><input id="un" required></div><div><label>Password</label><input id="up" type="text" required minlength="6"></div></div><button style="margin-top:16px">Create user</button></form>
-      <div class="glass panel wrap" id="ut"></div>
     </section>
     <section id="s-a" class="hide"><form class="glass panel" id="cf" style="max-width:440px"><h3>Change password</h3>
       <label>Current password</label><input id="c0" type="password" required><label>New password</label><input id="c1" type="password" minlength="6" required><label>Confirm new password</label><input id="c2" type="password" required>
@@ -113,14 +109,14 @@ async function api(action,d={}){
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.remove('hide');clearTimeout(t.h);t.h=setTimeout(()=>t.classList.add('hide'),2800)}
 const busy=(b,on)=>b.disabled=on;
 function view(){$('#login').classList.toggle('hide',!!S);$('#app').classList.toggle('hide',!S);
-  if(S){$('#who').textContent=S.user;$('#tu').classList.toggle('hide',S.role!=='superadmin');load()}}
+  if(S){$('#who').textContent=S.user;load()}}
 function signout(quiet){if(S&&!quiet)api('logout').catch(()=>{});S=null;localStorage.removeItem('bb');view()}
 $('#lo').onclick=()=>signout();
 $('#lf').onsubmit=async e=>{e.preventDefault();$('#le').textContent='';busy($('#lb'),1);
   try{S=await api('login',{u:$('#lu').value,p:$('#lp').value});localStorage.setItem('bb',JSON.stringify(S));$('#lp').value='';view()}
   catch(x){$('#le').textContent=x}busy($('#lb'),0)};
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
-  ['p','u','a'].forEach(k=>$('#s-'+k).classList.toggle('hide',k!==b.dataset.t));if(b.dataset.t==='u')users()});
+  ['p','a'].forEach(k=>$('#s-'+k).classList.toggle('hide',k!==b.dataset.t))});
 /* purchases */
 $('#pd').valueAsDate=new Date();
 const days=d=>Math.ceil((new Date(d+'T23:59:59')-new Date())/864e5);
@@ -139,11 +135,6 @@ $('#pf').onsubmit=async e=>{e.preventDefault();$('#pe').textContent='';busy($('#
   catch(x){$('#pe').textContent=x}$('#pb').textContent='Save purchase';busy($('#pb'),0)};
 async function rm(id){if(!confirm('Delete this purchase and its invoice?'))return;try{await api('del',{id});toast('Deleted');load()}catch(x){toast(x)}}
 async function inv(id){try{toast('Loading invoice…');const r=await api('invoice',{id});$('#im').src=`data:${r.mime};base64,${r.data}`;dg.showModal()}catch(x){toast(x)}}
-/* users */
-async function users(){try{const L=(await api('users')).users;$('#ut').innerHTML=`<table><tr><th>User</th><th>Role</th><th>Status</th><th></th></tr>${L.map(u=>`<tr><td>${esc(u.name)}</td><td>${u.role}</td><td><span class="chip ${u.active?'ok':'exp'}">${u.active?'Active':'Deactivated'}</span></td><td style="white-space:nowrap">${u.role==='superadmin'?'':`<button class="ghost sm" onclick="tg('${esc(u.name)}')">${u.active?'Deactivate':'Activate'}</button> <button class="ghost sm" onclick="rp('${esc(u.name)}')">Reset password</button> <button class="del sm" onclick="du('${esc(u.name)}')">Delete</button>`}</td></tr>`).join('')}</table>`}catch(x){toast(x)}}
-const act=async(a,d,m)=>{try{await api(a,d);toast(m);users()}catch(x){toast(x)}};
-const tg=n=>act('toggleUser',{name:n},'Status updated'),du=n=>confirm('Delete user '+n+'?')&&act('delUser',{name:n},'User deleted'),rp=n=>{const p=prompt('New password for '+n+' (min 6 chars):');p&&act('resetPw',{name:n,pw:p},'Password reset')};
-$('#uf').onsubmit=async e=>{e.preventDefault();try{await api('addUser',{name:$('#un').value,pw:$('#up').value});e.target.reset();toast('User created');users()}catch(x){toast(x)}};
 $('#cf').onsubmit=async e=>{e.preventDefault();const ce=$('#ce');ce.textContent='';
   if($('#c1').value!==$('#c2').value){ce.textContent='Passwords do not match';return}
   try{await api('changePw',{old:$('#c0').value,pw:$('#c1').value});e.target.reset();toast('Password updated')}catch(x){ce.textContent=x}};
